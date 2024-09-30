@@ -1,0 +1,214 @@
+services:
+  rabbitmq:
+    mem_limit: 2g
+    image: rabbitmq:management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - my_network
+    environment:
+      - RABBITMQ_DEFAULT_USER=myuser
+      - RABBITMQ_DEFAULT_PASS=mypassword
+    healthcheck:
+      test: [ "CMD", "rabbitmqctl", "status" ]  # Check RabbitMQ status
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+
+  front_end_db:
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=mypassword
+      - POSTGRES_DB=mydatabase
+    networks:
+      - my_network
+
+  browse_problems_db:
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=mypassword
+      - POSTGRES_DB=mydatabase
+    networks:
+      - my_network
+
+  buy_credits_db:
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=mypassword
+      - POSTGRES_DB=mydatabase
+    networks:
+      - my_network
+
+
+  manage_problems_db:
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=mypassword
+      - POSTGRES_DB=mydatabase
+    networks:
+      - my_network
+
+  front_end_service:
+    build:
+      context: ./front-end
+      dockerfile: Dockerfile
+    ports:
+      - "4007:4007"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      front_end_db:
+        condition: service_started
+    environment:
+      - DB_HOST=front_end_db
+      - DB_PORT=5432
+      - DB=mydatabase
+      - DB_USER=myuser
+      - DB_PASS=mypassword
+      - DB_TIMEZONE=UTC
+      - DB_SCHEMA=myschema
+      - BASE_URL=front_end_service
+      - SECRET_SESSION_STRING=9a845c30be6838b5ea4db5343a71a234
+      - SECRET_ENCRYPT=9a845c30be6838b5ea4db5343a71a234
+      - SECRET_STRING_SERVICES=9a845c30be6838b5ea4db5343a71a234
+    networks:
+      - my_network
+    restart: always
+
+  browse_problems_service:
+    build:
+      context: ./browse-problems-service
+      dockerfile: Dockerfile
+    ports:
+      - "4003:4003"
+    depends_on:
+      - browse_problems_db
+    environment:
+      - DB_HOST=browse_problems_db
+      - DB_PORT=5432
+      - DB=mydatabase
+      - DB_USER=myuser
+      - DB_PASS=mypassword
+      - DB_TIMEZONE=UTC
+      - DB_SCHEMA=myschema
+      - BASE_URL=browse_problems_service
+      - SECRET_STRING_SERVICES=9a845c30be6838b5ea4db5343a71a234
+      - SECRET_ENCRYPT=9a845c30be6838b5ea4db5343a71a234
+      - JWT_SECRET=supersecretjwtkey12345
+    networks:
+      - my_network
+    restart: always
+
+  buy_credits_service:
+    build:
+      context: ./buy-credits-service
+      dockerfile: Dockerfile
+    ports:
+      - "4002:4002"
+    depends_on:
+      - buy_credits_db
+    environment:
+      - DB_HOST=buy_credits_db
+      - DB_PORT=5432
+      - DB=mydatabase
+      - DB_USER=myuser
+      - DB_PASS=mypassword
+      - DB_TIMEZONE=UTC
+      - DB_SCHEMA=myschema
+      - BASE_URL=buy_credits_service
+      - SECRET_STRING_SERVICES=9a845c30be6838b5ea4db5343a71a234
+      - SECRET_ENCRYPT=9a845c30be6838b5ea4db5343a71a234
+      - JWT_SECRET=supersecretjwtkey12345
+      - RABBITMQ_HOST=rabbitmq   # RabbitMQ
+      - RABBITMQ_PORT=5672       # RabbitMQ
+    networks:
+      - my_network
+    restart: always
+
+  submit_problem_service:
+    build:
+      context: ./submit-problem-service
+      dockerfile: Dockerfile
+    ports:
+      - "4001:4001"
+    environment:
+      - BASE_URL=submit_problem_service
+      - SECRET_ENCRYPT=9a845c30be6838b5ea4db5343a71a234
+      - SECRET_STRING_SERVICES=9a845c30be6838b5ea4db5343a71a234
+      - JWT_SECRET=supersecretjwtkey12345
+    networks:
+      - my_network
+    restart: always
+
+  manage_problems_service:
+    build:
+      context: ./manage-problems-service
+      dockerfile: Dockerfile
+    ports:
+      - "4004:4004"
+    depends_on:
+      manage_problems_db:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - DB_HOST=manage_problems_db
+      - DB_PORT=5432
+      - DB=mydatabase
+      - DB_USER=myuser
+      - DB_PASS=mypassword
+      - DB_TIMEZONE=UTC
+      - DB_SCHEMA=myschema
+      - BASE_URL=manage_problems_service
+      - SECRET_STRING_SERVICES=9a845c30be6838b5ea4db5343a71a234
+      - SECRET_ENCRYPT=9a845c30be6838b5ea4db5343a71a234
+      - JWT_SECRET=supersecretjwtkey12345
+      - RABBITMQ_HOST=rabbitmq   # RabbitMQ
+      - RABBITMQ_PORT=5672       # RabbitMQ
+    networks:
+      - my_network
+    restart: always
+
+  problem_stats_service:
+    build:
+      context: ./problem-stats-service
+      dockerfile: Dockerfile
+    ports:
+      - "4006:4006"
+    environment:
+      - BASE_URL=problem_stats_service
+    networks:
+      - my_network
+    restart: always
+
+  ortools_service:
+    build:
+      context: ./ortools-service
+      dockerfile: Dockerfile
+    ports:
+      - "4008:4008"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - BASE_URL=ortools_service
+      - SECRET_ENCRYPT=9a845c30be6838b5ea4db5343a71a234
+      - SECRET_STRING_SERVICES=9a845c30be6838b5ea4db5343a71a234
+      - JWT_SECRET=supersecretjwtkey12345
+      - RABBITMQ_HOST=rabbitmq   # RabbitMQ
+      - RABBITMQ_PORT=5672       # RabbitMQ
+    networks:
+      - my_network
+    restart: always
+
+networks:
+  my_network:
+    driver: bridge
